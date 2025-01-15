@@ -3,7 +3,7 @@ requires-python = ">=3.12"
 
 [[package]]
 name = "aiousbwatcher"
-version = "0.3.0"
+version = "1.0.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncinotify" },

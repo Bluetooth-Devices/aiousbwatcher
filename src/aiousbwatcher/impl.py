@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from collections.abc import Generator
 from functools import partial
 from pathlib import Path
 from typing import Callable
@@ -16,15 +15,8 @@ class InotifyNotAvailableError(Exception):
     """Raised when inotify is not available on the platform."""
 
 
-def _get_directories_recursive_gen(path: Path) -> Generator[Path, None, None]:
-    if path.is_dir():
-        yield path
-        for child in path.iterdir():
-            yield from _get_directories_recursive_gen(child)
-
-
 def _get_directories_recursive(path: Path) -> list[Path]:
-    return list(_get_directories_recursive_gen(path))
+    return [dirpath for dirpath, dirnames, filenames in path.walk()]
 
 
 async def _async_get_directories_recursive(
