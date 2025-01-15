@@ -78,3 +78,16 @@ async def test_aiousbwatcher_broken_callbacks(
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_attempt_to_start_twice(tmp_path: Path) -> None:
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        stop = watcher.async_start()
+        with pytest.raises(RuntimeError):
+            watcher.async_start()
+        stop()
