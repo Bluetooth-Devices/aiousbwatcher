@@ -48,7 +48,7 @@ class AIOUSBWatcher:
             raise RuntimeError("Watcher already started")
         try:
             from asyncinotify import Inotify  # noqa
-        except AttributeError as ex:
+        except Exception as ex:
             raise InotifyNotAvailableError(
                 "Inotify not available on this platform"
             ) from ex
