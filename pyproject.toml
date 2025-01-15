@@ -160,3 +160,9 @@ match = "main"
 [tool.semantic_release.branches.noop]
 match = "(?!main$)"
 prerelease = true
+
+[tool.uv]
+dev-dependencies = [
+    "pytest-asyncio>=0.25.2",
+    "pytest-cov>=6.0.0",
+]

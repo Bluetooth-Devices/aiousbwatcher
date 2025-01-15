@@ -7,14 +7,13 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
-from asyncinotify import Inotify, Mask
-
-_BASE_MASK = (
-    Mask.MOVED_FROM | Mask.MOVED_TO | Mask.CREATE | Mask.DELETE_SELF | Mask.IGNORED
-)
 _PATH = "/dev/bus/usb"
 
 _LOGGER = logging.getLogger(__name__)
+
+
+class InotifyNotAvailableError(Exception):
+    """Raised when inotify is not available on the platform."""
 
 
 def _get_directories_recursive_gen(path: Path) -> Generator[Path, None, None]:
@@ -38,9 +37,7 @@ class AIOUSBWatcher:
     """A watcher for USB devices that uses asyncio."""
 
     def __init__(self) -> None:
-        self._inotify = Inotify()
         self._path = Path(_PATH)
-        self._mask = Mask.CREATE | _BASE_MASK
         self._loop = asyncio.get_running_loop()
         self._task: asyncio.Task[None] | None = None
         self._callbacks: set[Callable[[], None]] = set()
@@ -49,6 +46,12 @@ class AIOUSBWatcher:
         """Start the watcher."""
         if self._task is not None:
             raise RuntimeError("Watcher already started")
+        try:
+            from asyncinotify import Inotify  # noqa
+        except AttributeError as ex:
+            raise InotifyNotAvailableError(
+                "Inotify not available on this platform"
+            ) from ex
         self._task = self._loop.create_task(self._watcher())
         return self._async_stop
 
@@ -66,11 +69,22 @@ class AIOUSBWatcher:
         self._task = None
 
     async def _watcher(self) -> None:
+        from asyncinotify import Inotify, Mask
+
+        mask = (
+            Mask.CREATE
+            | Mask.MOVED_FROM
+            | Mask.MOVED_TO
+            | Mask.CREATE
+            | Mask.DELETE_SELF
+            | Mask.IGNORED
+        )
+
         with Inotify() as inotify:
             for directory in await _async_get_directories_recursive(
                 self._loop, self._path
             ):
-                inotify.add_watch(directory, self._mask)
+                inotify.add_watch(directory, mask)
 
             async for event in inotify:
                 # Add subdirectories to watch if a new directory is added.
@@ -78,10 +92,10 @@ class AIOUSBWatcher:
                     for directory in await _async_get_directories_recursive(
                         self._loop, event.path
                     ):
-                        inotify.add_watch(directory, self._mask)
+                        inotify.add_watch(directory, mask)
 
                 # If there is at least some overlap, assume the user wants this event.
-                if event.mask & self._mask:
+                if event.mask & mask:
                     self._async_call_callbacks()
 
     def _async_unregister_callback(self, callback: Callable[[], None]) -> None:
