@@ -36,7 +36,8 @@ async def test_aiousbwatcher_callbacks(tmp_path: Path) -> None:
         (tmp_path / "test").touch()
         await asyncio.sleep(0.1)
         assert called
-        unregister()  # type: ignore[unreachable]
+        called = False  # type: ignore[unreachable]
+        unregister()
         stop()
         await asyncio.sleep(0.1)
         assert not called
