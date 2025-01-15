@@ -133,6 +133,7 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         (tmp_path / "test" / "test2").touch()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
+        called = False
         unregister()
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
