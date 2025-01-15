@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.3.0 (2025-01-15)
+
+### Features
+
+- Improve example to show how to stop the watcher (#6) ([`27a9a14`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/27a9a142589444f167ab5d576975fa3409c40776))
+
 ## v0.2.0 (2025-01-15)
 
 ### Features

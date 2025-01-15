@@ -4,22 +4,19 @@ requires = [ "setuptools" ]
 
 [project]
 name = "aiousbwatcher"
-version = "0.2.0"
+version = "0.3.0"
 description = "Watch for USB devices to be plugged and unplugged"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [
   { name = "J. Nick Koston", email = "bluetooth@koston.org" },
 ]
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 classifiers = [
   "Development Status :: 2 - Pre-Alpha",
   "Intended Audience :: Developers",
   "Natural Language :: English",
   "Operating System :: OS Independent",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
   "Topic :: Software Development :: Libraries",
