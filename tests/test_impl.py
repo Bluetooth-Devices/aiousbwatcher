@@ -118,6 +118,10 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
         called = False
+        (tmp_path / "test" / "test2").unlink()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
         (tmp_path / "test").rmdir()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
