@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.0.0 (2025-01-15)
+
+### Features
+
+- Drop python older than 3.12 (#9) ([`1a30665`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/1a30665a82a41f1b3c9922637faef32611bd6162))
+
 ## v0.3.0 (2025-01-15)
 
 ### Features
