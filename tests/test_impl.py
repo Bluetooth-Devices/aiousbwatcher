@@ -91,3 +91,50 @@ async def test_aiousbwatcher_attempt_to_start_twice(tmp_path: Path) -> None:
         with pytest.raises(RuntimeError):
             watcher.async_start()
         stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        unregister = watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not called
+        (tmp_path / "test").mkdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False  # type: ignore[unreachable]
+        (tmp_path / "test" / "test2").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
+        (tmp_path / "test" / "test2").unlink()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
+        (tmp_path / "test").rmdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
+        (tmp_path / "test").mkdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
+        (tmp_path / "test" / "test2").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        called = False
+        unregister()
+        stop()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not called
