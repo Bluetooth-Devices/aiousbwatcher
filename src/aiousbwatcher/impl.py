@@ -77,6 +77,7 @@ class AIOUSBWatcher:
             | Mask.MOVED_TO
             | Mask.CREATE
             | Mask.DELETE_SELF
+            | Mask.DELETE
             | Mask.IGNORED
         )
 
