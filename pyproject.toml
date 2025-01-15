@@ -26,6 +26,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "asyncinotify>=4.2.0",
 ]
 urls."Bug Tracker" = "https://github.com/bluetooth-devices/aiousbwatcher/issues"
 urls.Changelog = "https://github.com/bluetooth-devices/aiousbwatcher/blob/main/CHANGELOG.md"
@@ -159,3 +160,9 @@ match = "main"
 [tool.semantic_release.branches.noop]
 match = "(?!main$)"
 prerelease = true
+
+[tool.uv]
+dev-dependencies = [
+    "pytest-asyncio>=0.25.2",
+    "pytest-cov>=6.0.0",
+]
