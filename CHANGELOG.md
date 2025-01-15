@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.0 (2025-01-15)
+
+### Features
+
+- Use `path.walk` instead of recursive `path.iterdir` (#7) ([`122afa6`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/122afa6d61df188bf4bee6a964c08c050f797218))
+
 ## v1.0.0 (2025-01-15)
 
 ### Features
