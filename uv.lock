@@ -7,7 +7,7 @@ resolution-markers = [
 
 [[package]]
 name = "aiousbwatcher"
-version = "0.0.0"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "asyncinotify" },
