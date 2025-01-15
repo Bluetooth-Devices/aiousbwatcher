@@ -1,5 +1,11 @@
 # Changelog
 
+## v0.2.0 (2025-01-15)
+
+### Features
+
+- Add example watcher (#5) ([`02d9afd`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/02d9afdd7a8158561ed4c3d7d7550fc53bfdc948))
+
 ## v0.1.0 (2025-01-15)
 
 ### Features
