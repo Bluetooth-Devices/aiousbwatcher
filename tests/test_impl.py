@@ -7,6 +7,8 @@ import pytest
 
 from aiousbwatcher import AIOUSBWatcher, InotifyNotAvailableError
 
+_INOTIFY_WAIT_TIME = 0.2
+
 
 @pytest.mark.asyncio
 @pytest.mark.skipif(platform == "linux", reason="Inotify is available on this platform")
@@ -31,15 +33,15 @@ async def test_aiousbwatcher_callbacks(tmp_path: Path) -> None:
         watcher = AIOUSBWatcher()
         unregister = watcher.async_register_callback(callback)
         stop = watcher.async_start()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
         (tmp_path / "test").touch()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
         called = False  # type: ignore[unreachable]
         unregister()
         stop()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
 
 
@@ -64,15 +66,15 @@ async def test_aiousbwatcher_broken_callbacks(
         unregister = watcher.async_register_callback(broken_callback)
         unregister2 = watcher.async_register_callback(callback)
         stop = watcher.async_start()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
         (tmp_path / "test").touch()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
         called = False  # type: ignore[unreachable]
         assert "Broken" in caplog.text
         unregister()
         unregister2()
         stop()
-        await asyncio.sleep(0.1)
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
