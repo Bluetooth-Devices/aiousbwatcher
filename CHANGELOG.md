@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1 (2025-01-28)
+
+### Bug fixes
+
+- Import asyncinotify sooner to avoid blocking i/o in the event loop (#12) ([`c57d32e`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/c57d32ed170b00d3222ad4093920b20698413cb0))
+
 ## v1.1.0 (2025-01-15)
 
 ### Features
