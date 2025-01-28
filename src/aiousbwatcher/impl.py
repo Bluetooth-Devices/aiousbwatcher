@@ -6,6 +6,14 @@ from functools import partial
 from pathlib import Path
 from typing import Callable
 
+_INOTIFY_EXCEPTION: Exception | None = None
+try:
+    from asyncinotify import Inotify, Mask
+except Exception as ex:
+    _INOTIFY_EXCEPTION = ex
+    Mask = Inotify = None
+
+
 _PATH = "/dev/bus/usb"
 
 _LOGGER = logging.getLogger(__name__)
@@ -38,12 +46,10 @@ class AIOUSBWatcher:
         """Start the watcher."""
         if self._task is not None:
             raise RuntimeError("Watcher already started")
-        try:
-            from asyncinotify import Inotify  # noqa
-        except Exception as ex:
+        if _INOTIFY_EXCEPTION is not None:
             raise InotifyNotAvailableError(
                 "Inotify not available on this platform"
-            ) from ex
+            ) from _INOTIFY_EXCEPTION
         self._task = self._loop.create_task(self._watcher())
         return self._async_stop
 
@@ -61,8 +67,6 @@ class AIOUSBWatcher:
         self._task = None
 
     async def _watcher(self) -> None:
-        from asyncinotify import Inotify, Mask
-
         mask = (
             Mask.CREATE
             | Mask.MOVED_FROM
