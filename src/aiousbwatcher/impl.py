@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import warnings
 from functools import partial
 from pathlib import Path
 from typing import Callable
 
 _INOTIFY_EXCEPTION: Exception | None = None
 try:
+    with warnings.catch_warnings(action="ignore", category=UserWarning):
+        from asyncinotify._ffi import libc  # noqa: F401
     from asyncinotify import Inotify, Mask
 except Exception as ex:
     _INOTIFY_EXCEPTION = ex
