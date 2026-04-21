@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.2 (2026-04-21)
+
+### Bug fixes
+
+- Catch asyncinotify importerror (#30) ([`5042f6a`](https://github.com/Bluetooth-Devices/aiousbwatcher/commit/5042f6a818b01cf4b23bf9ffce284e84f365bceb))
+
 ## v1.1.1 (2025-01-28)
 
 ### Bug fixes
