@@ -39,11 +39,23 @@ async def _async_get_directories_recursive(
 class AIOUSBWatcher:
     """A watcher for USB devices that uses asyncio."""
 
-    def __init__(self) -> None:
+    def __init__(self, debounce: float | None = None) -> None:
+        """
+        Initialize the watcher.
+
+        ``debounce``, when set to a number of seconds, coalesces a burst of
+        filesystem events into a single callback invocation that fires once the
+        events have been quiet for that long. Plugging in a single USB device
+        churns ``/dev/bus/usb`` with several events, so consumers that perform
+        an expensive rescan per callback can use this to rescan only once.
+        When ``None`` (the default) every event fires the callbacks immediately.
+        """
         self._path = Path(_PATH)
         self._loop = asyncio.get_running_loop()
         self._task: asyncio.Task[None] | None = None
         self._callbacks: set[Callable[[], None]] = set()
+        self._debounce = debounce
+        self._debounce_handle: asyncio.TimerHandle | None = None
 
     def async_start(self) -> Callable[[], None]:
         """Start the watcher."""
@@ -68,6 +80,10 @@ class AIOUSBWatcher:
         assert self._task is not None  # noqa
         self._task.cancel()
         self._task = None
+        if self._debounce_handle is not None:
+            # Drop any pending coalesced callback so it cannot fire after stop.
+            self._debounce_handle.cancel()
+            self._debounce_handle = None
 
     async def _watcher(self) -> None:
         mask = (
@@ -102,6 +118,19 @@ class AIOUSBWatcher:
         self._callbacks.remove(callback)
 
     def _async_call_callbacks(self) -> None:
+        if self._debounce is None:
+            self._async_fire_callbacks()
+            return
+        # Coalesce a burst of events: (re)arm a single timer so the callbacks
+        # fire once the events have been quiet for ``self._debounce`` seconds.
+        if self._debounce_handle is not None:
+            self._debounce_handle.cancel()
+        self._debounce_handle = self._loop.call_later(
+            self._debounce, self._async_fire_callbacks
+        )
+
+    def _async_fire_callbacks(self) -> None:
+        self._debounce_handle = None
         for callback in self._callbacks:
             try:
                 callback()
