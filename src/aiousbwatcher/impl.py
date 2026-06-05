@@ -19,6 +19,11 @@ except Exception as ex:
 
 _PATH = "/dev/bus/usb"
 
+# How long to wait before restarting the watcher after an unexpected
+# OSError. USB hotplug churns /dev/bus/usb constantly, so a transient
+# failure should self-heal rather than permanently stop the watcher.
+_AUTO_RECOVER_TIME = 5
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -69,30 +74,59 @@ class AIOUSBWatcher:
         self._task.cancel()
         self._task = None
 
+    def _add_watches(
+        self, inotify: Inotify, mask: Mask, directories: list[Path]
+    ) -> None:
+        """Add a watch for each directory, skipping any that have vanished."""
+        # USB hotplug races mean a directory discovered by the recursive walk
+        # can disappear before we get to watch it. Skip those rather than
+        # letting the whole watcher crash.
+        for directory in directories:
+            try:
+                inotify.add_watch(directory, mask)
+            except OSError as ex:
+                _LOGGER.debug("Could not watch %s: %s", directory, ex)
+
     async def _watcher(self) -> None:
+        """Run the watcher, auto-recovering from transient OS errors."""
+        while True:
+            try:
+                await self._run_watcher()
+            except asyncio.CancelledError:
+                raise
+            except OSError as ex:
+                _LOGGER.warning(
+                    "USB watcher stopped unexpectedly (%s); restarting in %s seconds",
+                    ex,
+                    _AUTO_RECOVER_TIME,
+                )
+                await asyncio.sleep(_AUTO_RECOVER_TIME)
+
+    async def _run_watcher(self) -> None:
         mask = (
             Mask.CREATE
             | Mask.MOVED_FROM
             | Mask.MOVED_TO
-            | Mask.CREATE
             | Mask.DELETE_SELF
             | Mask.DELETE
             | Mask.IGNORED
         )
 
         with Inotify() as inotify:
-            for directory in await _async_get_directories_recursive(
-                self._loop, self._path
-            ):
-                inotify.add_watch(directory, mask)
+            self._add_watches(
+                inotify,
+                mask,
+                await _async_get_directories_recursive(self._loop, self._path),
+            )
 
             async for event in inotify:
                 # Add subdirectories to watch if a new directory is added.
                 if Mask.CREATE in event.mask and event.path is not None:
-                    for directory in await _async_get_directories_recursive(
-                        self._loop, event.path
-                    ):
-                        inotify.add_watch(directory, mask)
+                    self._add_watches(
+                        inotify,
+                        mask,
+                        await _async_get_directories_recursive(self._loop, event.path),
+                    )
 
                 # If there is at least some overlap, assume the user wants this event.
                 if event.mask & mask:
