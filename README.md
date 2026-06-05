@@ -80,7 +80,7 @@ asyncio.run(main())
 
 `async_register_callback` returns a callable that unregisters that callback, and
 `async_start` returns a callable that stops the watcher. Callbacks take no
-arguments — they signal *that* something changed, not *what*; rescan your
+arguments — they signal _that_ something changed, not _what_; rescan your
 devices to find the details.
 
 ### Debouncing event bursts
