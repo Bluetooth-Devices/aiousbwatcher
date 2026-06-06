@@ -81,6 +81,26 @@ async def test_aiousbwatcher_broken_callbacks(
 
 
 @pytest.mark.asyncio
+async def test_aiousbwatcher_callback_unregisters_during_fire() -> None:
+    watcher = AIOUSBWatcher()
+    fired: list[str] = []
+
+    def first() -> None:
+        fired.append("first")
+        unregister_first()
+
+    def second() -> None:
+        fired.append("second")
+
+    unregister_first = watcher.async_register_callback(first)
+    watcher.async_register_callback(second)
+
+    watcher._async_call_callbacks()
+
+    assert sorted(fired) == ["first", "second"]
+
+
+@pytest.mark.asyncio
 @pytest.mark.skipif(
     platform != "linux", reason="Inotify not available on this platform"
 )
