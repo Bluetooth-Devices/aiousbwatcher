@@ -117,7 +117,7 @@ async def test_aiousbwatcher_recovers_from_oserror(tmp_path: Path) -> None:
         (tmp_path / "test").touch()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
-        stop()
+        stop()  # type: ignore[unreachable]
 
 
 @pytest.mark.asyncio
@@ -136,7 +136,7 @@ async def test_aiousbwatcher_skips_unwatchable_directory(tmp_path: Path) -> None
 
     real_add_watch = Inotify.add_watch
 
-    def flaky_add_watch(self, directory, mask):  # type: ignore[no-untyped-def]
+    def flaky_add_watch(self, directory, mask):
         # Simulate a hotplug race: a freshly created subdir has already vanished.
         if Path(directory).name == "ghost":
             raise FileNotFoundError("directory vanished")
