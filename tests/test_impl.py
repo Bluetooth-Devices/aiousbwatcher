@@ -138,3 +138,63 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
+
+
+_DEBOUNCE_TIME = 0.5
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_debounce_coalesces_bursts(tmp_path: Path) -> None:
+    count: int = 0
+
+    def callback() -> None:
+        nonlocal count
+        count += 1
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher(debounce=_DEBOUNCE_TIME)
+        unregister = watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert count == 0
+        # A burst of events within the debounce window must not fire yet.
+        for i in range(3):
+            (tmp_path / f"test{i}").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert count == 0
+        # Once the events go quiet for the debounce window, fire exactly once.
+        await asyncio.sleep(_DEBOUNCE_TIME)
+        assert count == 1
+        unregister()
+        stop()
+        await asyncio.sleep(_DEBOUNCE_TIME + _INOTIFY_WAIT_TIME)
+        assert count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_debounce_cancelled_on_stop(tmp_path: Path) -> None:
+    count: int = 0
+
+    def callback() -> None:
+        nonlocal count
+        count += 1
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher(debounce=_DEBOUNCE_TIME)
+        unregister = watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        (tmp_path / "test").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        # Stopping while a debounced callback is still pending must drop it.
+        assert count == 0
+        unregister()
+        stop()
+        await asyncio.sleep(_DEBOUNCE_TIME + _INOTIFY_WAIT_TIME)
+        assert count == 0

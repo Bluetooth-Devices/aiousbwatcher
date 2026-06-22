@@ -46,6 +46,57 @@ Install this via pip (or your favourite package manager):
 
 `pip install aiousbwatcher`
 
+## Usage
+
+```python
+import asyncio
+
+from aiousbwatcher import AIOUSBWatcher, InotifyNotAvailableError
+
+
+async def main() -> None:
+    def _callback() -> None:
+        # A USB device was plugged in or unplugged; rescan as needed.
+        print("USB devices changed")
+
+    watcher = AIOUSBWatcher()
+    unregister = watcher.async_register_callback(_callback)
+
+    try:
+        stop = watcher.async_start()
+    except InotifyNotAvailableError:
+        # inotify is only available on Linux.
+        return
+
+    # ... run your application ...
+    await asyncio.sleep(60)
+
+    unregister()
+    stop()
+
+
+asyncio.run(main())
+```
+
+`async_register_callback` returns a callable that unregisters that callback, and
+`async_start` returns a callable that stops the watcher. Callbacks take no
+arguments — they signal _that_ something changed, not _what_; rescan your
+devices to find the details.
+
+### Debouncing event bursts
+
+Plugging in a single USB device churns `/dev/bus/usb` with several events, so a
+naive callback fires multiple times per physical change. If your callback does
+expensive work (such as a full device rescan), pass `debounce` to coalesce a
+burst into a single invocation that fires once events have been quiet for the
+given number of seconds:
+
+```python
+watcher = AIOUSBWatcher(debounce=0.5)
+```
+
+With `debounce=None` (the default) every event fires the callbacks immediately.
+
 ## Contributors ✨
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
