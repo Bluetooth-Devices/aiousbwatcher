@@ -84,6 +84,22 @@ async def test_aiousbwatcher_broken_callbacks(
 @pytest.mark.skipif(
     platform != "linux", reason="Inotify not available on this platform"
 )
+async def test_aiousbwatcher_double_unregister(tmp_path: Path) -> None:
+    def callback() -> None:
+        pass
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        unregister = watcher.async_register_callback(callback)
+        unregister()
+        # Unregistering a second time must not raise.
+        unregister()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
 async def test_aiousbwatcher_attempt_to_start_twice(tmp_path: Path) -> None:
     with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
         watcher = AIOUSBWatcher()

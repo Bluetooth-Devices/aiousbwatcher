@@ -99,7 +99,7 @@ class AIOUSBWatcher:
                     self._async_call_callbacks()
 
     def _async_unregister_callback(self, callback: Callable[[], None]) -> None:
-        self._callbacks.remove(callback)
+        self._callbacks.discard(callback)
 
     def _async_call_callbacks(self) -> None:
         for callback in self._callbacks:
