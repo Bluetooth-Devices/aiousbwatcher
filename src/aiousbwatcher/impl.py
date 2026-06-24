@@ -102,7 +102,7 @@ class AIOUSBWatcher:
         self._callbacks.remove(callback)
 
     def _async_call_callbacks(self) -> None:
-        for callback in self._callbacks:
+        for callback in list(self._callbacks):
             try:
                 callback()
             except Exception as e:
