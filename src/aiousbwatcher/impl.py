@@ -65,7 +65,8 @@ class AIOUSBWatcher:
 
     def _async_stop(self) -> None:
         """Stop the watcher."""
-        assert self._task is not None  # noqa
+        if self._task is None:
+            return
         self._task.cancel()
         self._task = None
 
