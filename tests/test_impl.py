@@ -1,7 +1,7 @@
 import asyncio
 from pathlib import Path
 from sys import platform
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -91,6 +91,18 @@ async def test_aiousbwatcher_attempt_to_start_twice(tmp_path: Path) -> None:
         with pytest.raises(RuntimeError):
             watcher.async_start()
         stop()
+
+
+@pytest.mark.asyncio
+async def test_aiousbwatcher_stop_is_idempotent() -> None:
+    watcher = AIOUSBWatcher()
+    task = Mock()
+    watcher._task = task
+
+    watcher._async_stop()
+    watcher._async_stop()
+
+    task.cancel.assert_called_once()
 
 
 @pytest.mark.asyncio
