@@ -21,6 +21,21 @@ _PATH = "/dev/bus/usb"
 
 _LOGGER = logging.getLogger(__name__)
 
+# Guarded because Mask is None when inotify is unavailable (non-Linux / missing
+# backend). async_start() raises InotifyNotAvailableError before _MASK is used.
+_MASK = (
+    (
+        Mask.CREATE
+        | Mask.MOVED_FROM
+        | Mask.MOVED_TO
+        | Mask.DELETE_SELF
+        | Mask.DELETE
+        | Mask.IGNORED
+    )
+    if Mask is not None
+    else None
+)
+
 
 class InotifyNotAvailableError(Exception):
     """Raised when inotify is not available on the platform."""
@@ -53,7 +68,17 @@ class AIOUSBWatcher:
             raise InotifyNotAvailableError(
                 "Inotify not available on this platform"
             ) from _INOTIFY_EXCEPTION
-        self._task = self._loop.create_task(self._watcher())
+        # Install the initial watches synchronously so the watcher is guaranteed
+        # to be observing before async_start() returns. Deferring this to the
+        # task would leave a window in which USB changes are silently missed.
+        inotify = Inotify()
+        try:
+            for directory in _get_directories_recursive(self._path):
+                inotify.add_watch(directory, _MASK)
+        except BaseException:
+            inotify.close()
+            raise
+        self._task = self._loop.create_task(self._watcher(inotify))
         return self._async_stop
 
     def async_register_callback(
@@ -69,34 +94,21 @@ class AIOUSBWatcher:
         self._task.cancel()
         self._task = None
 
-    async def _watcher(self) -> None:
-        mask = (
-            Mask.CREATE
-            | Mask.MOVED_FROM
-            | Mask.MOVED_TO
-            | Mask.CREATE
-            | Mask.DELETE_SELF
-            | Mask.DELETE
-            | Mask.IGNORED
-        )
-
-        with Inotify() as inotify:
-            for directory in await _async_get_directories_recursive(
-                self._loop, self._path
-            ):
-                inotify.add_watch(directory, mask)
-
+    async def _watcher(self, inotify: Inotify) -> None:
+        try:
             async for event in inotify:
                 # Add subdirectories to watch if a new directory is added.
                 if Mask.CREATE in event.mask and event.path is not None:
                     for directory in await _async_get_directories_recursive(
                         self._loop, event.path
                     ):
-                        inotify.add_watch(directory, mask)
+                        inotify.add_watch(directory, _MASK)
 
                 # If there is at least some overlap, assume the user wants this event.
-                if event.mask & mask:
+                if event.mask & _MASK:
                     self._async_call_callbacks()
+        finally:
+            inotify.close()
 
     def _async_unregister_callback(self, callback: Callable[[], None]) -> None:
         self._callbacks.remove(callback)

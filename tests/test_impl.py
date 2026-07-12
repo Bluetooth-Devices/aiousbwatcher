@@ -84,6 +84,31 @@ async def test_aiousbwatcher_broken_callbacks(
 @pytest.mark.skipif(
     platform != "linux", reason="Inotify not available on this platform"
 )
+async def test_aiousbwatcher_event_during_startup(tmp_path: Path) -> None:
+    """A change occurring immediately after async_start() must not be missed."""
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        unregister = watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        # No await between start and the event: watches must already be installed
+        # by the time async_start() returns, otherwise this event is lost.
+        (tmp_path / "test").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        unregister()
+        stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
 async def test_aiousbwatcher_attempt_to_start_twice(tmp_path: Path) -> None:
     with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
         watcher = AIOUSBWatcher()
