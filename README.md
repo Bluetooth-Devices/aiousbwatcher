@@ -46,6 +46,41 @@ Install this via pip (or your favourite package manager):
 
 `pip install aiousbwatcher`
 
+## Usage
+
+`AIOUSBWatcher` watches `/dev/bus/usb` and calls your callbacks whenever a USB
+device is plugged in or unplugged:
+
+```python
+import asyncio
+
+from aiousbwatcher import AIOUSBWatcher, InotifyNotAvailableError
+
+
+async def main() -> None:
+    # Must be created from within a running event loop.
+    watcher = AIOUSBWatcher()
+
+    def on_change() -> None:
+        print("USB devices changed")
+
+    unregister = watcher.async_register_callback(on_change)
+
+    try:
+        stop = watcher.async_start()
+    except InotifyNotAvailableError:
+        # inotify is unavailable on this platform (e.g. non-Linux).
+        return
+
+    await asyncio.sleep(60)
+
+    unregister()
+    stop()
+
+
+asyncio.run(main())
+```
+
 ## Contributors ✨
 
 Thanks goes to these wonderful people ([emoji key](https://allcontributors.org/docs/en/emoji-key)):
