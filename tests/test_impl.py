@@ -380,3 +380,54 @@ async def test_aiousbwatcher_closes_inotify_when_watching_fails(
         ):
             watcher._make_inotify()
         assert closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_recovers_when_reopening_inotify_fails(
+    tmp_path: Path,
+) -> None:
+    """A failure to re-create the Inotify after an error must not kill the watcher."""
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    runs: int = 0
+    reopens: int = 0
+    real_run_watcher = AIOUSBWatcher._run_watcher
+    real_make_inotify = AIOUSBWatcher._make_inotify
+
+    async def flaky_run_watcher(self: AIOUSBWatcher, inotify: Any) -> None:
+        nonlocal runs
+        runs += 1
+        if runs == 1:
+            raise OSError("transient inotify failure")
+        await real_run_watcher(self, inotify)
+
+    def flaky_make_inotify(self: AIOUSBWatcher) -> Any:
+        nonlocal reopens
+        reopens += 1
+        if reopens == 2:
+            raise OSError("cannot reopen inotify")
+        return real_make_inotify(self)
+
+    with (
+        patch("aiousbwatcher.impl._PATH", str(tmp_path)),
+        patch.object(impl, "_AUTO_RECOVER_TIME", 0),
+        patch.object(AIOUSBWatcher, "_run_watcher", flaky_run_watcher),
+        patch.object(AIOUSBWatcher, "_make_inotify", flaky_make_inotify),
+    ):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        # Run 1 fails, the first reopen fails too, the next one succeeds.
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert reopens >= 3
+        (tmp_path / "test").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        stop()
