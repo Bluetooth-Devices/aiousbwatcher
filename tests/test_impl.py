@@ -344,3 +344,39 @@ async def test_aiousbwatcher_ignores_sibling_paths(tmp_path: Path) -> None:
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
         stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_watch_paths_climb_to_existing_ancestor(tmp_path: Path) -> None:
+    missing = tmp_path / "a" / "b" / "usb"
+    assert impl._get_watch_paths(missing) == [tmp_path]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_closes_inotify_when_watching_fails(
+    tmp_path: Path,
+) -> None:
+    closed = False
+
+    def close(self: Any) -> None:
+        nonlocal closed
+        closed = True
+
+    def add_watches(inotify: Any) -> None:
+        raise OSError("boom")
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        with (
+            patch.object(watcher, "_add_watches", add_watches),
+            patch.object(impl.Inotify, "close", close),
+            pytest.raises(OSError, match="boom"),
+        ):
+            watcher._make_inotify()
+        assert closed

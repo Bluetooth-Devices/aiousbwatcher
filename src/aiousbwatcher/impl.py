@@ -38,7 +38,7 @@ _MASK: Mask = (
         | Mask.IGNORED
     )
     if Mask is not None
-    else None  # type: ignore[assignment]
+    else None
 )
 
 
