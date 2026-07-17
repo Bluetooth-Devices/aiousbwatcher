@@ -138,3 +138,83 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_path_created_after_start(tmp_path: Path) -> None:
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    usb_path = tmp_path / "usb"
+    with patch("aiousbwatcher.impl._PATH", str(usb_path)):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not called
+        usb_path.mkdir()
+        (usb_path / "001").mkdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        (usb_path / "001" / "002").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        stop()  # type: ignore[unreachable]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_path_replaced_after_start(tmp_path: Path) -> None:
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    usb_path = tmp_path / "usb"
+    usb_path.mkdir()
+    with patch("aiousbwatcher.impl._PATH", str(usb_path)):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        usb_path.rmdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        usb_path.mkdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        called = False
+        (usb_path / "001").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert called
+        stop()  # type: ignore[unreachable]
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_ignores_sibling_paths(tmp_path: Path) -> None:
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    usb_path = tmp_path / "usb"
+    usb_path.mkdir()
+    with patch("aiousbwatcher.impl._PATH", str(usb_path)):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        (tmp_path / "not-usb").mkdir()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not called
+        stop()

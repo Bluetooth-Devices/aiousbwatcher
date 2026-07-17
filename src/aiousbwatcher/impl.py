@@ -26,14 +26,14 @@ class InotifyNotAvailableError(Exception):
     """Raised when inotify is not available on the platform."""
 
 
-def _get_directories_recursive(path: Path) -> list[Path]:
-    return [dirpath for dirpath, dirnames, filenames in path.walk()]
-
-
-async def _async_get_directories_recursive(
-    loop: asyncio.AbstractEventLoop, path: Path
-) -> list[Path]:
-    return await loop.run_in_executor(None, _get_directories_recursive, path)
+def _get_watch_paths(path: Path) -> list[Path]:
+    """Return the nearest existing ancestor of path plus every directory under it."""
+    # The ancestor is watched so the watcher notices path itself being created or
+    # replaced; path's tree is empty when path does not exist yet.
+    ancestor = path.parent
+    while not ancestor.is_dir() and ancestor.parent != ancestor:
+        ancestor = ancestor.parent
+    return [ancestor, *(dirpath for dirpath, dirnames, filenames in path.walk())]
 
 
 class AIOUSBWatcher:
@@ -81,22 +81,35 @@ class AIOUSBWatcher:
         )
 
         with Inotify() as inotify:
-            for directory in await _async_get_directories_recursive(
-                self._loop, self._path
-            ):
-                inotify.add_watch(directory, mask)
+            await self._async_add_watches(inotify, mask)
 
             async for event in inotify:
-                # Add subdirectories to watch if a new directory is added.
-                if Mask.CREATE in event.mask and event.path is not None:
-                    for directory in await _async_get_directories_recursive(
-                        self._loop, event.path
-                    ):
-                        inotify.add_watch(directory, mask)
+                if event.path is not None and not self._is_relevant(event.path):
+                    continue
+
+                # Watch anything new: a subdirectory, or the watched path itself
+                # being created after a mount or an unplug/replug of the bus.
+                if Mask.CREATE in event.mask:
+                    await self._async_add_watches(inotify, mask)
 
                 # If there is at least some overlap, assume the user wants this event.
                 if event.mask & mask:
                     self._async_call_callbacks()
+
+    def _is_relevant(self, path: Path) -> bool:
+        """Return True for events on the watched path, its tree, or its ancestors."""
+        return (
+            path == self._path
+            or self._path in path.parents
+            or path in self._path.parents
+        )
+
+    async def _async_add_watches(self, inotify: Inotify, mask: Mask) -> None:
+        """Watch the path's tree and the nearest existing ancestor of it."""
+        for directory in await self._loop.run_in_executor(
+            None, _get_watch_paths, self._path
+        ):
+            inotify.add_watch(directory, mask)
 
     def _async_unregister_callback(self, callback: Callable[[], None]) -> None:
         self._callbacks.remove(callback)
