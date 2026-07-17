@@ -431,3 +431,30 @@ async def test_aiousbwatcher_recovers_when_reopening_inotify_fails(
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
         stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_ignores_events_outside_the_mask(tmp_path: Path) -> None:
+    """An event with no overlap with the watch mask must not fire callbacks."""
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    class _Event:
+        path = None
+        mask = impl.Mask.MODIFY
+
+    class _FakeInotify:
+        async def __aiter__(self) -> Any:
+            yield _Event()
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        await watcher._run_watcher(_FakeInotify())
+        assert not called
