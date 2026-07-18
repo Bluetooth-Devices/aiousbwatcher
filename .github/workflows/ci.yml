@@ -81,7 +81,11 @@ jobs:
       - name: Test release
         uses: python-semantic-release/python-semantic-release@v9.15.1
         with:
-          no_operation_mode: true
+          # v9.15.1 has no `no_operation_mode` input; unknown `with:` keys are
+          # silently ignored, so the old value ran a real `version` (default
+          # push: true) and 403'd on the contents:read token. `--noop` via
+          # root_options is the supported dry-run switch at this pin.
+          root_options: "-v --noop"
 
   # Real release, only on main. The release environment and write/OIDC
   # permissions are scoped to this job so they never apply to PR runs.
