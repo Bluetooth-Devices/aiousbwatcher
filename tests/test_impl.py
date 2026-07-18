@@ -193,7 +193,7 @@ async def test_aiousbwatcher_path_replaced_after_start(tmp_path: Path) -> None:
         (usb_path / "001").touch()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert called
-        stop()  # type: ignore[unreachable]
+        stop()
 
 
 @pytest.mark.asyncio
@@ -218,3 +218,12 @@ async def test_aiousbwatcher_ignores_sibling_paths(tmp_path: Path) -> None:
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
         stop()
+
+
+def test_get_watch_paths_walks_up_to_nearest_existing_ancestor(tmp_path: Path) -> None:
+    from aiousbwatcher.impl import _get_watch_paths
+
+    # path and its intermediate parents do not exist yet; the nearest existing
+    # ancestor (tmp_path) must be returned so a later mkdir is noticed.
+    missing = tmp_path / "a" / "b" / "usb"
+    assert _get_watch_paths(missing) == [tmp_path]
