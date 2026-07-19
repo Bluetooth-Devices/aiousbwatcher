@@ -138,3 +138,37 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
         assert not called
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_moved_in_directory_is_watched(tmp_path: Path) -> None:
+    """A directory tree moved into the watched path must be watched too."""
+    events: list[None] = []
+    watched = tmp_path / "watched"
+    watched.mkdir()
+    staging = tmp_path / "staging"
+    (staging / "sub").mkdir(parents=True)
+
+    with patch("aiousbwatcher.impl._PATH", str(watched)):
+        watcher = AIOUSBWatcher()
+        unregister = watcher.async_register_callback(lambda: events.append(None))
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not events
+
+        # Atomically move an already-populated tree in, as udev does.
+        staging.rename(watched / "003")
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert events  # MOVED_TO on the watched dir itself
+        events.clear()
+
+        # Events *inside* the moved-in tree must reach us as well.
+        (watched / "003" / "sub" / "dev").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert events
+
+        unregister()
+        stop()

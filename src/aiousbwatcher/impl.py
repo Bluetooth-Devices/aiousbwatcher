@@ -87,8 +87,13 @@ class AIOUSBWatcher:
                 inotify.add_watch(directory, mask)
 
             async for event in inotify:
-                # Add subdirectories to watch if a new directory is added.
-                if Mask.CREATE in event.mask and event.path is not None:
+                # Watch subdirectories that are created in, or moved into, the
+                # tree. udev populates a directory before moving it into place,
+                # so a moved-in tree must be walked, not just its root.
+                if (
+                    event.mask & (Mask.CREATE | Mask.MOVED_TO)
+                    and event.path is not None
+                ):
                     for directory in await _async_get_directories_recursive(
                         self._loop, event.path
                     ):
