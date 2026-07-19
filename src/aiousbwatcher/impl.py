@@ -138,9 +138,12 @@ class AIOUSBWatcher:
             if event.path is not None and not self._is_relevant(event.path):
                 continue
 
-            # Watch anything new: a subdirectory, or the watched path itself
-            # being created after a mount or an unplug/replug of the bus.
-            if Mask.CREATE in event.mask:
+            # Watch anything new: a subdirectory, the watched path itself being
+            # created after a mount or an unplug/replug of the bus, or a tree
+            # renamed into place. udev populates a directory before moving it
+            # in, so MOVED_TO must trigger a re-walk as well -- otherwise the
+            # moved-in subtree goes unwatched and every event inside it is lost.
+            if event.mask & (Mask.CREATE | Mask.MOVED_TO):
                 await self._loop.run_in_executor(None, self._add_watches, inotify)
 
             # If there is at least some overlap, assume the user wants this event.

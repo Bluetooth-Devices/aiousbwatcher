@@ -458,3 +458,39 @@ async def test_aiousbwatcher_ignores_events_outside_the_mask(tmp_path: Path) -> 
         watcher.async_register_callback(callback)
         await watcher._run_watcher(_FakeInotify())
         assert not called
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_moved_in_directory_is_watched(tmp_path: Path) -> None:
+    """A tree renamed into the watched path must be watched, not just reported."""
+    events: list[None] = []
+    watched = tmp_path / "watched"
+    watched.mkdir()
+    staging = tmp_path / "staging"
+    (staging / "sub").mkdir(parents=True)
+
+    with patch("aiousbwatcher.impl._PATH", str(watched)):
+        watcher = AIOUSBWatcher()
+        unregister = watcher.async_register_callback(lambda: events.append(None))
+        stop = watcher.async_start()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not events
+
+        # Atomically move an already-populated tree in, as udev does.
+        staging.rename(watched / "003")
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert events  # MOVED_TO on the watched dir itself
+        events.clear()
+
+        # Events *inside* the moved-in tree must reach us as well. This is what
+        # breaks when only CREATE triggers a re-walk: the assertion above still
+        # passes, so the blind subtree is invisible to a smoke test.
+        (watched / "003" / "sub" / "dev").touch()
+        await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert events
+
+        unregister()
+        stop()
