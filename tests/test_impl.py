@@ -1,11 +1,13 @@
 import asyncio
 from pathlib import Path
 from sys import platform
+from typing import Any
 from unittest.mock import patch
 
 import pytest
 
-from aiousbwatcher import AIOUSBWatcher, InotifyNotAvailableError
+from aiousbwatcher import AIOUSBWatcher, InotifyNotAvailableError, impl
+from aiousbwatcher.impl import Inotify
 
 _INOTIFY_WAIT_TIME = 0.2
 
@@ -162,4 +164,51 @@ async def test_aiousbwatcher_subdirs_added(tmp_path: Path) -> None:
         unregister()
         stop()
         await asyncio.sleep(_INOTIFY_WAIT_TIME)
+        assert not called
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_start_closes_inotify_on_failure(tmp_path: Path) -> None:
+    """A failure while installing the initial watches must not leak the fd."""
+    with (
+        patch("aiousbwatcher.impl._PATH", str(tmp_path)),
+        patch.object(Inotify, "add_watch", side_effect=OSError("boom")),
+        patch.object(Inotify, "close") as close,
+    ):
+        watcher = AIOUSBWatcher()
+        with pytest.raises(OSError):
+            watcher.async_start()
+    close.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_ignores_events_outside_the_mask(tmp_path: Path) -> None:
+    """An event with no overlap with the watch mask must not fire callbacks."""
+    called: bool = False
+
+    def callback() -> None:
+        nonlocal called
+        called = True
+
+    class _Event:
+        path = None
+        mask = impl.Mask.MODIFY
+
+    class _FakeInotify:
+        def close(self) -> None:
+            pass
+
+        async def __aiter__(self) -> Any:
+            yield _Event()
+
+    with patch("aiousbwatcher.impl._PATH", str(tmp_path)):
+        watcher = AIOUSBWatcher()
+        watcher.async_register_callback(callback)
+        await watcher._watcher(_FakeInotify())
         assert not called
