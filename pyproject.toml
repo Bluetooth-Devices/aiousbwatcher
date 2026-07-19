@@ -43,7 +43,7 @@ docs = [
 ]
 
 [tool.ruff]
-target-version = "py39"
+target-version = "py312"
 line-length = 88
 lint.select = [
   "B",   # flake8-bugbear
