@@ -3,9 +3,9 @@ from __future__ import annotations
 import asyncio
 import logging
 import warnings
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
-from typing import Callable
 
 _INOTIFY_EXCEPTION: Exception | None = None
 try:
