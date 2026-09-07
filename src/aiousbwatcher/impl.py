@@ -127,6 +127,12 @@ class AIOUSBWatcher:
                     ex,
                     _AUTO_RECOVER_TIME,
                 )
+            except Exception:
+                # Anything else is not recoverable, but it must not vanish into
+                # the Task: without this the watcher dies permanently and
+                # silently, and the caller has no way to find out.
+                _LOGGER.exception("USB watcher died and will not restart")
+                raise
             finally:
                 if inotify is not None:
                     inotify.close()

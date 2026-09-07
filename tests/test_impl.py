@@ -494,3 +494,29 @@ async def test_aiousbwatcher_moved_in_directory_is_watched(tmp_path: Path) -> No
 
         unregister()
         stop()
+
+
+@pytest.mark.asyncio
+@pytest.mark.skipif(
+    platform != "linux", reason="Inotify not available on this platform"
+)
+async def test_aiousbwatcher_logs_unexpected_death(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """An unexpected exception must be logged, not swallowed by the Task."""
+
+    async def boom(self: AIOUSBWatcher, inotify: Any) -> None:
+        raise RuntimeError("kaboom")
+
+    with (
+        patch("aiousbwatcher.impl._PATH", str(tmp_path)),
+        patch.object(AIOUSBWatcher, "_run_watcher", boom),
+    ):
+        watcher = AIOUSBWatcher()
+        watcher.async_start()
+        task = watcher._task
+        assert task is not None
+        with pytest.raises(RuntimeError):
+            await task
+
+    assert "kaboom" in caplog.text
